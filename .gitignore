@@ -6,6 +6,10 @@ backend/data/
 
 # Logs
 backend/logs/
+airflow/logs/
 
 # Spotify OAuth cache
 .cache
+
+# Docker volumes
+postgres-db-volume/
