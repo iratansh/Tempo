@@ -118,16 +118,16 @@ This matches the schema names referenced in `tempo_analytics/target/` artifacts.
 erDiagram
   RAW_DATA_LISTENING_HISTORY {
     int id PK
-    timestamp extraction_timestamp
-    jsonb raw_data
-    timestamp ingestion_timestamp
+    datetime extraction_timestamp
+    json raw_data
+    datetime ingestion_timestamp
   }
 
   STG_RAW_LISTENING_HISTORY {
     int raw_id
-    timestamp extraction_timestamp
-    timestamp ingestion_timestamp
-    timestamp played_at
+    datetime extraction_timestamp
+    datetime ingestion_timestamp
+    datetime played_at
     string track_id
     string artist_id
     string album_id
@@ -143,25 +143,25 @@ erDiagram
     int track_duration_ms
     string track_uri
     string album_id
-    timestamp last_updated
+    datetime last_updated
   }
 
   DIM_ARTISTS {
     string artist_id PK
     string artist_name
     string artist_uri
-    timestamp last_updated
+    datetime last_updated
   }
 
   DIM_ALBUMS {
     string album_id PK
     string album_name
     string album_type
-    string album_release_date
+    date album_release_date
     int album_total_tracks
     string album_image_url
     string album_uri
-    timestamp last_updated
+    datetime last_updated
   }
 
   FCT_LISTENING_HISTORY {
@@ -169,14 +169,14 @@ erDiagram
     string track_id FK
     string artist_id FK
     string album_id FK
-    timestamp played_at
+    datetime played_at
     date played_date
     int played_hour
     int day_of_week
     string context_type
     string context_uri
-    timestamp extraction_timestamp
-    timestamp ingestion_timestamp
+    datetime extraction_timestamp
+    datetime ingestion_timestamp
   }
 
   RAW_DATA_LISTENING_HISTORY ||--o{ STG_RAW_LISTENING_HISTORY : expands_to_events
