@@ -23,6 +23,8 @@ x-airflow-common:
     - ./backend:/opt/airflow/backend
     - ./.cache:/opt/airflow/.cache
     - ./requirements.txt:/requirements.txt
+    - ./tempo_analytics:/opt/airflow/tempo_analytics
+    - ./profiles_docker.yml:/opt/airflow/profiles.yml
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -54,7 +56,12 @@ services:
   airflow-webserver:
     <<: *airflow-common
     container_name: tempo_airflow_webserver
-    command: webserver
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        pip install --no-cache-dir -r /requirements.txt
+        exec airflow webserver
     ports:
       - "8080:8080"
     healthcheck:
@@ -73,7 +80,12 @@ services:
   airflow-scheduler:
     <<: *airflow-common
     container_name: tempo_airflow_scheduler
-    command: scheduler
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        pip install --no-cache-dir -r /requirements.txt
+        exec airflow scheduler
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
       interval: 30s
@@ -106,5 +118,28 @@ services:
       _AIRFLOW_WWW_USER_PASSWORD: admin
     user: "0:0"
 
+  # Apache Superset
+  superset:
+    image: apache/superset:3.1.0
+    container_name: tempo_superset
+    environment:
+      SUPERSET_SECRET_KEY: 'tempo_secret_key_change_in_production'
+    ports:
+      - "8088:8088"
+    volumes:
+      - superset-data:/app/superset_home
+    depends_on:
+      - postgres
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        superset db upgrade
+        superset fab create-admin --username admin --firstname Admin --lastname User --email admin@tempo.com --password admin
+        superset init
+        superset run -h 0.0.0.0 -p 8088 --with-threads --reload --debugger
+    restart: always
+
 volumes:
   postgres-db-volume:
+  superset-data:

@@ -1,0 +1,83 @@
+version: 2
+
+models:
+  - name: stg_raw_listening_history
+    description: Staging view that parses raw JSON into flat structure
+    columns:
+      - name: played_at
+        description: Timestamp when track was played
+        tests:
+          - not_null
+      - name: track_id
+        description: Spotify track ID
+        tests:
+          - not_null
+
+  - name: dim_tracks
+    description: Dimension table containing unique tracks
+    columns:
+      - name: track_id
+        description: Spotify track ID (primary key)
+        tests:
+          - unique
+          - not_null
+      - name: track_name
+        description: Name of the track
+        tests:
+          - not_null
+
+  - name: dim_artists
+    description: Dimension table containing unique artists
+    columns:
+      - name: artist_id
+        description: Spotify artist ID (primary key)
+        tests:
+          - unique
+          - not_null
+      - name: artist_name
+        description: Name of the artist
+        tests:
+          - not_null
+
+  - name: dim_albums
+    description: Dimension table containing unique albums
+    columns:
+      - name: album_id
+        description: Spotify album ID (primary key)
+        tests:
+          - unique
+          - not_null
+
+  - name: fct_listening_history
+    description: Fact table containing all listening events
+    columns:
+      - name: listening_event_id
+        description: Surrogate key for listening event
+        tests:
+          - unique
+          - not_null
+      - name: track_id
+        description: Foreign key to dim_tracks
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_tracks')
+              field: track_id
+      - name: artist_id
+        description: Foreign key to dim_artists
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_artists')
+              field: artist_id
+      - name: album_id
+        description: Foreign key to dim_albums
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_albums')
+              field: album_id
+      - name: played_at
+        description: When the track was played
+        tests:
+          - not_null

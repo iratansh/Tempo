@@ -34,7 +34,6 @@ if __name__ == "__main__":
     filename = f"raw_listening_history_{timestamp}.json"
     extractor.save_to_json(listening_history, filename)
 
-    print(f"\n✅ Milestone 1 Complete!")
     print(f"   - Data extracted from Spotify API")
     print(f"   - Saved to: backend/data/{filename}")
     print(f"   - Ready for Airflow ingestion (Milestone 2)")

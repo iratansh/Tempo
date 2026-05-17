@@ -1,0 +1,13 @@
+tempo_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: postgres
+      port: 5432
+      user: postgres
+      password: postgres
+      dbname: tempo_warehouse
+      schema: analytics
+      threads: 4
+      keepalives_idle: 0

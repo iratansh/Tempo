@@ -138,7 +138,7 @@ def verify_data_quality(**context):
 
     if latest_result:
         latest_ts, track_count = latest_result
-        logger.info(f"✅ Data Quality Check Passed:")
+        logger.info(f" Data Quality Check Passed:")
         logger.info(f"   Total records in database: {total_rows}")
         logger.info(f"   Latest extraction: {latest_ts}")
         logger.info(f"   Tracks in latest extraction: {track_count}")
