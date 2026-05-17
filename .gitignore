@@ -1,0 +1,11 @@
+.env
+.venv/
+
+# Data files (raw extraction output)
+backend/data/
+
+# Logs
+backend/logs/
+
+# Spotify OAuth cache
+.cache
