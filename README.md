@@ -59,7 +59,7 @@ flowchart LR
   subgraph Code
     DAG[airflow/dags/spotify_ingestion_dag.py]
     Extractor[backend/modules/Extract.py\nSpotifyExtractor]
-    DBT[tempo_analytics (dbt project)]
+    DBT["tempo_analytics (dbt project)"]
   end
 
   AWeb --- ASched
