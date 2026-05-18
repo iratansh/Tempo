@@ -1,9 +1,12 @@
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import json
+import io
 import logging
 from datetime import datetime
 from typing import List, Dict, Optional
+from minio import Minio
+from minio.error import S3Error
 
 # Configure logging
 logging.basicConfig(
@@ -164,4 +167,54 @@ class SpotifyExtractor:
             logger.info(f"Successfully saved data to backend/data/{filename}")
         except Exception as e:
             logger.error(f"Failed to save JSON file: {str(e)}")
+            raise
+
+    def save_to_minio(
+        self,
+        data: Dict,
+        bucket: str,
+        object_name: str,
+        endpoint: str,
+        access_key: str,
+        secret_key: str,
+        secure: bool = False
+    ) -> None:
+        """
+        Save extracted data to MinIO (S3-compatible data lake).
+
+        Args:
+            data: Dictionary to upload
+            bucket: MinIO bucket name
+            object_name: Object key (e.g., path/filename.json)
+            endpoint: MinIO endpoint (host:port)
+            access_key: MinIO access key
+            secret_key: MinIO secret key
+            secure: Use TLS (False for local default)
+        """
+        try:
+            client = Minio(
+                endpoint,
+                access_key=access_key,
+                secret_key=secret_key,
+                secure=secure
+            )
+
+            if not client.bucket_exists(bucket):
+                client.make_bucket(bucket)
+
+            payload = json.dumps(data, indent=2).encode("utf-8")
+            client.put_object(
+                bucket,
+                object_name,
+                io.BytesIO(payload),
+                length=len(payload),
+                content_type="application/json"
+            )
+
+            logger.info(f"Successfully saved data to MinIO: {bucket}/{object_name}")
+        except S3Error as e:
+            logger.error(f"MinIO S3 error: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"Failed to save to MinIO: {str(e)}")
             raise

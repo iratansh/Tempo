@@ -11,6 +11,7 @@ Tempo is a small data pipeline that extracts Spotify listening history, lands th
 - PostgreSQL 15 (Airflow metadata + `tempo_warehouse` data warehouse)
 - dbt (`dbt-postgres`) for transformations and tests
 - Docker Compose (local orchestration of services)
+- MinIO (local S3-compatible data lake)
 - Apache Superset (BI / dashboards)
 
 ## Repository layout
@@ -24,7 +25,7 @@ Tempo is a small data pipeline that extracts Spotify listening history, lands th
   - `dags/spotify_ingestion_dag.py`: scheduled ingestion DAG (extract → load → verify)
 - `sql/init_db.sql`: initializes the `tempo_warehouse` database and raw landing table
 - `tempo_analytics/`: dbt project that builds staging + analytics tables from raw JSON
-- `docker-compose.yml`: local stack (Postgres, Airflow, Superset)
+- `docker-compose.yml`: local stack (Postgres, Airflow, MinIO, Superset)
 
 ## Configuration
 
@@ -40,6 +41,13 @@ Tempo expects Spotify API credentials to be provided as environment variables:
   - `SPOTIFY_CLIENT_SECRET` (from `CLIENT_SECRET`)
   - `SPOTIFY_REDIRECT_URI` (from `REDIRECT_URL`)
 
+- MinIO (data lake):
+  - `MINIO_ENDPOINT` (local runner default: `localhost:9000`, docker default: `minio:9000`)
+  - `MINIO_ACCESS_KEY` (default: `minioadmin`)
+  - `MINIO_SECRET_KEY` (default: `minioadmin`)
+  - `MINIO_BUCKET` (default: `tempo-data`)
+  - `MINIO_SECURE` (`true`/`false`, default: `false`)
+
 ## Architecture
 
 ```mermaid
@@ -52,6 +60,7 @@ flowchart LR
     AWeb[Airflow Webserver]
     ASched[Airflow Scheduler]
     AInit[Airflow Init]
+    MinIO[(MinIO)]
     PG[(PostgreSQL 15)]
     Superset[Apache Superset]
   end
@@ -70,6 +79,7 @@ flowchart LR
   DAG --> Extractor
   Extractor --> Spotify
 
+  Extractor --> MinIO
   DAG --> PG
   DBT --> PG
   Superset --> PG
@@ -82,13 +92,15 @@ sequenceDiagram
   autonumber
   participant Airflow as Airflow DAG
   participant Spotify as Spotify Web API
+  participant MinIO as MinIO (S3)
   participant Postgres as Postgres (tempo_warehouse)
   participant dbt as dbt models
   participant Superset as Superset
 
   Airflow->>Spotify: Extract recently played tracks
   Spotify-->>Airflow: JSON payload (listening events)
-  Airflow->>Postgres: Insert into raw_data.listening_history (JSONB)
+  Airflow->>MinIO: Write raw JSON object
+  Airflow->>Postgres: Load from MinIO into raw_data.listening_history
   Airflow->>Postgres: Verify latest extraction + counts
 
   dbt->>Postgres: Build staging view from JSONB

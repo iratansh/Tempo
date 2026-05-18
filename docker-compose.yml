@@ -16,6 +16,12 @@ x-airflow-common:
     SPOTIFY_CLIENT_ID: ${CLIENT_ID}
     SPOTIFY_CLIENT_SECRET: ${CLIENT_SECRET}
     SPOTIFY_REDIRECT_URI: ${REDIRECT_URL}
+    # MinIO (S3-compatible data lake)
+    MINIO_ENDPOINT: minio:9000
+    MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+    MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+    MINIO_BUCKET: ${MINIO_BUCKET:-tempo-data}
+    MINIO_SECURE: 'false'
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/logs:/opt/airflow/logs
@@ -30,8 +36,30 @@ x-airflow-common:
     &airflow-common-depends-on
     postgres:
       condition: service_healthy
+    minio:
+      condition: service_healthy
 
 services:
+  # MinIO (S3-compatible data lake)
+  minio:
+    image: minio/minio:latest
+    container_name: tempo_minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+
   # PostgreSQL Database (Data Warehouse + Airflow Metadata)
   postgres:
     image: postgres:15
@@ -143,3 +171,4 @@ services:
 volumes:
   postgres-db-volume:
   superset-data:
+  minio-data:

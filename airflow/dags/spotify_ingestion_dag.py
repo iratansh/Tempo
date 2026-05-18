@@ -11,6 +11,9 @@ import sys
 import os
 import json
 import logging
+import io
+from minio import Minio
+from minio.error import S3Error
 
 # Add backend directory to Python path
 sys.path.insert(0, '/opt/airflow/backend')
@@ -54,13 +57,46 @@ def extract_spotify_data(**context):
 
     logger.info(f"Successfully extracted {listening_history['total_tracks']} tracks")
 
-    # Push data to XCom for next task
-    context['task_instance'].xcom_push(
-        key='listening_history',
-        value=listening_history
-    )
+    # Save to MinIO (data lake)
+    minio_endpoint = os.getenv('MINIO_ENDPOINT', 'minio:9000')
+    minio_access_key = os.getenv('MINIO_ACCESS_KEY', 'minioadmin')
+    minio_secret_key = os.getenv('MINIO_SECRET_KEY', 'minioadmin')
+    minio_bucket = os.getenv('MINIO_BUCKET', 'tempo-data')
+    minio_secure = os.getenv('MINIO_SECURE', 'false').lower() in {"1", "true", "yes"}
 
-    return listening_history['total_tracks']
+    object_name = f"listening_history/raw_listening_history_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+
+    try:
+        client = Minio(
+            minio_endpoint,
+            access_key=minio_access_key,
+            secret_key=minio_secret_key,
+            secure=minio_secure
+        )
+
+        if not client.bucket_exists(minio_bucket):
+            client.make_bucket(minio_bucket)
+
+        payload = json.dumps(listening_history, indent=2).encode("utf-8")
+        client.put_object(
+            minio_bucket,
+            object_name,
+            io.BytesIO(payload),
+            length=len(payload),
+            content_type="application/json"
+        )
+
+        logger.info(f"Saved to MinIO: {minio_bucket}/{object_name}")
+
+        context['task_instance'].xcom_push(
+            key='minio_object_name',
+            value=object_name
+        )
+
+        return listening_history['total_tracks']
+    except S3Error as e:
+        logger.error(f"MinIO S3 error: {str(e)}")
+        raise
 
 
 def load_to_postgres(**context):
@@ -69,11 +105,38 @@ def load_to_postgres(**context):
     """
     logger.info("Loading data to PostgreSQL...")
 
-    # Pull data from XCom
-    listening_history = context['task_instance'].xcom_pull(
+    # Pull MinIO object name from XCom
+    object_name = context['task_instance'].xcom_pull(
         task_ids='extract_spotify_data',
-        key='listening_history'
+        key='minio_object_name'
     )
+
+    if not object_name:
+        logger.warning("No MinIO object to load")
+        return 0
+
+    # Fetch from MinIO
+    minio_endpoint = os.getenv('MINIO_ENDPOINT', 'minio:9000')
+    minio_access_key = os.getenv('MINIO_ACCESS_KEY', 'minioadmin')
+    minio_secret_key = os.getenv('MINIO_SECRET_KEY', 'minioadmin')
+    minio_bucket = os.getenv('MINIO_BUCKET', 'tempo-data')
+    minio_secure = os.getenv('MINIO_SECURE', 'false').lower() in {"1", "true", "yes"}
+
+    client = Minio(
+        minio_endpoint,
+        access_key=minio_access_key,
+        secret_key=minio_secret_key,
+        secure=minio_secure
+    )
+
+    response = client.get_object(minio_bucket, object_name)
+    try:
+        payload = response.read()
+    finally:
+        response.close()
+        response.release_conn()
+
+    listening_history = json.loads(payload.decode("utf-8"))
 
     if not listening_history or not listening_history.get('data'):
         logger.warning("No data to load")
